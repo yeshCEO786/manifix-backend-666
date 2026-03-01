@@ -1,24 +1,43 @@
 {
   "name": "manifix-backend-666",
   "version": "1.0.0",
-  "type": "module",
+  "description": "ManifiX AI Backend API",
   "main": "server.js",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
+  "keywords": [
+    "manifix",
+    "ai",
+    "backend",
+    "express",
+    "railway"
+  ],
+  "author": "YeshCEO786",
+  "license": "ISC",
   "dependencies": {
-    "axios": "^1.13.5",
+    "axios": "^1.7.0",
+    "body-parser": "^2.2.2",
     "cors": "^2.8.6",
-    "dotenv": "^16.6.1",
+    "dotenv": "^16.4.5",
     "express": "^4.22.1",
-    "express-rate-limit": "^8.2.1",
-    "multer": "^2.0.2",
-    "node-fetch": "^3.3.2",
-    "nodemon": "^3.1.11"
+    "sqlite3": "^5.1.7",
+    "stripe": "^20.4.0"
   },
-  "description": "",
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yeshCEO786/manifix-backend-666.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yeshCEO786/manifix-backend-666/issues"
+  },
+  "homepage": "https://github.com/yeshCEO786/manifix-backend-666#readme"
 }

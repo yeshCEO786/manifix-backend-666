@@ -1,31 +1,25 @@
+// backend/app.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import authRoutes from "./routes/authRoutes.js";
-import vibeRoutes from "./routes/vibe.routes.js";
-import stripeRouter from "./routes/stripe.js";
 import axios from "axios";
 
+// Load env variables
 dotenv.config();
 
 const app = express();
 
-/* =========================
-   Middleware
-========================= */
-app.use(cors({ origin: "*", credentials: true }));
+// -------- MIDDLEWARE --------
+app.use(cors()); // For dev, allow all origins
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(stripeRouter);
 
-/* =========================
-   Health Check
-========================= */
-app.get("/api/health", (req, res) => res.json({ status: "ok" }));
+// -------- HEALTH CHECK --------
+app.get("/", (req, res) => {
+  res.send("Backend running 🚀");
+});
 
-/* =========================
-   Chat Route
-========================= */
+// -------- AI CHAT ROUTE --------
 app.post("/chat", async (req, res) => {
   const { message } = req.body;
   if (!message) return res.status(400).json({ reply: "Message is required" });
@@ -50,29 +44,11 @@ app.post("/chat", async (req, res) => {
 
     const reply = response.data.choices[0].message.content;
     res.json({ reply });
+
   } catch (error) {
-    console.error(error.response?.data || error.message);
+    console.error("Chat error:", error.response?.data || error.message);
     res.status(500).json({ reply: "Something went wrong 🤍" });
   }
-});
-
-/* =========================
-   Other Routes
-========================= */
-app.use("/api/vibes", vibeRoutes);
-app.use("/api/auth", authRoutes);
-
-/* =========================
-   404 Handler
-========================= */
-app.use((req, res) => res.status(404).json({ error: "Route not found" }));
-
-/* =========================
-   Global Error Handler
-========================= */
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: "Internal Server Error" });
 });
 
 export default app;
