@@ -1,8 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import authRoutes from "./routes/authRoutes.js";
-import vibeRoutes from "./routes/vibe.routes.js";
+import authRoutes from "./routes/auth.routes.js";
 import stripeRouter from "./routes/stripe.js";
 import axios from "axios";
 
@@ -59,7 +58,6 @@ app.post("/chat", async (req, res) => {
 /* =========================
    Other Routes
 ========================= */
-app.use("/api/vibes", vibeRoutes);
 app.use("/api/auth", authRoutes);
 
 /* =========================
@@ -75,4 +73,4 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal Server Error" });
 });
 
-export default app;
+export default app; 
