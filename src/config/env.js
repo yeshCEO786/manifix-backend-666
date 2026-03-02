@@ -1,99 +1,132 @@
-// src/config/env.js
+// config/env.js
 
 import dotenv from "dotenv";
+import Joi from "joi";
 
 dotenv.config();
 
-/**
- * Throws error if required env variable is missing
- */
-function required(name) {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`❌ Missing required environment variable: ${name}`);
-  }
-  return value;
-}
+const isProd = process.env.NODE_ENV === "production";
 
-export const env = {
+const schema = Joi.object({
+  NODE_ENV: Joi.string()
+    .valid("development", "production", "test")
+    .default("development"),
+
+  PORT: Joi.number().default(5000),
+
   // ======================
-  // Server
+  // CORS
   // ======================
-  NODE_ENV: process.env.NODE_ENV || "production",
-  PORT: Number(process.env.PORT) || 5000,
-  CORS_ORIGIN: required("CORS_ORIGIN"),
+  CORS_ORIGIN: Joi.string().uri().required(),
 
   // ======================
   // AI
   // ======================
-  OPENROUTER_API_KEY: required("OPENROUTER_API_KEY"),
-  OPENROUTER_MODEL: required("OPENROUTER_MODEL"),
-  ENABLE_STREAMING: process.env.ENABLE_STREAMING === "true",
+  OPENROUTER_API_KEY: isProd
+    ? Joi.string().required()
+    : Joi.string().optional(),
 
-  // ======================
-  // Voice
-  // ======================
-  COQUI_TTS_URL: required("COQUI_TTS_URL"),
-  WHISPER_MODEL: required("WHISPER_MODEL"),
-  FRONTEND_URL: required("FRONTEND_URL"),
+  OPENROUTER_MODEL: Joi.string().required(),
 
-  // ======================
-  // Files
-  // ======================
-  MAX_UPLOAD_SIZE_MB: Number(process.env.MAX_UPLOAD_SIZE_MB) || 20,
-  FILE_STORAGE_PATH: required("FILE_STORAGE_PATH"),
-
-  // ======================
-  // Weather
-  // ======================
-  WEATHER_API_KEY: required("WEATHER_API_KEY"),
-
-  // ======================
-  // News
-  // ======================
-  NEWS_API_KEY: required("NEWS_API_KEY"),
-  GNEWS_API_KEY: required("GNEWS_API_KEY"),
-
-  // ======================
-  // Finance
-  // ======================
-  ALPHA_VANTAGE_KEY: required("ALPHA_VANTAGE_KEY"),
-
-  // ======================
-  // Database
-  // ======================
-  DB_USER: required("DB_USER"),
-  DB_PASSWORD: required("DB_PASSWORD"),
-  DB_HOST: required("DB_HOST"),
-  DB_PORT: Number(process.env.DB_PORT) || 5432,
-  DB_NAME: required("DB_NAME"),
+  ENABLE_STREAMING: Joi.boolean().default(true),
 
   // ======================
   // Supabase
   // ======================
-  SUPABASE_URL: required("SUPABASE_URL"),
-  SUPABASE_ROLE_KEY: required("SUPABASE_ROLE_KEY"),
+  SUPABASE_URL: Joi.string().uri().required(),
+  SUPABASE_ROLE_KEY: Joi.string().required(),
+
+  // ======================
+  // Database
+  // ======================
+  DB_USER: Joi.string().required(),
+  DB_PASSWORD: Joi.string().required(),
+  DB_HOST: Joi.string().required(),
+  DB_PORT: Joi.number().default(5432),
+  DB_NAME: Joi.string().required(),
 
   // ======================
   // Stripe
   // ======================
-  STRIPE_SECRET_KEY: required("STRIPE_SECRET_KEY"),
-  STRIPE_WEBHOOK_SECRET: required("STRIPE_WEBHOOK_SECRET"),
+  STRIPE_SECRET_KEY: isProd
+    ? Joi.string().required()
+    : Joi.string().optional(),
+
+  STRIPE_WEBHOOK_SECRET: isProd
+    ? Joi.string().required()
+    : Joi.string().optional(),
 
   // ======================
   // Security
   // ======================
-  RATE_LIMIT_PER_MIN: Number(process.env.RATE_LIMIT_PER_MIN) || 30,
-  JWT_SECRET: required("JWT_SECRET"),
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || "7d",
+  JWT_SECRET: Joi.string().min(32).required(),
+  JWT_EXPIRES_IN: Joi.string().default("7d"),
+  RATE_LIMIT_PER_MIN: Joi.number().default(30),
 
   // ======================
-  // Redis & Logging
+  // Redis
   // ======================
-  LOG_LEVEL: process.env.LOG_LEVEL || "info",
-  REDIS_URL: required("REDIS_URL"),
-  STREAM_TIMEOUT_MS: Number(process.env.STREAM_TIMEOUT_MS) || 30000,
-  WS_ALLOWED_ORIGINS: required("WS_ALLOWED_ORIGINS")
-    .split(",")
-    .map(origin => origin.trim()),
+  REDIS_URL: Joi.string().required(),
+
+  // ======================
+  // Logging
+  // ======================
+  LOG_LEVEL: Joi.string()
+    .valid("error", "warn", "info", "debug")
+    .default("info"),
+})
+  .unknown()
+  .required();
+
+const { error, value } = schema.validate(process.env);
+
+if (error) {
+  console.error("❌ ENV Validation Error:", error.message);
+  process.exit(1);
+}
+
+const config = {
+  env: value.NODE_ENV,
+  port: value.PORT,
+  corsOrigin: value.CORS_ORIGIN,
+
+  ai: {
+    apiKey: value.OPENROUTER_API_KEY,
+    model: value.OPENROUTER_MODEL,
+    streaming: value.ENABLE_STREAMING,
+  },
+
+  supabase: {
+    url: value.SUPABASE_URL,
+    roleKey: value.SUPABASE_ROLE_KEY,
+  },
+
+  db: {
+    user: value.DB_USER,
+    password: value.DB_PASSWORD,
+    host: value.DB_HOST,
+    port: value.DB_PORT,
+    name: value.DB_NAME,
+  },
+
+  stripe: {
+    secretKey: value.STRIPE_SECRET_KEY,
+    webhookSecret: value.STRIPE_WEBHOOK_SECRET,
+  },
+
+  security: {
+    jwtSecret: value.JWT_SECRET,
+    jwtExpiresIn: value.JWT_EXPIRES_IN,
+    rateLimit: value.RATE_LIMIT_PER_MIN,
+  },
+
+  redis: {
+    url: value.REDIS_URL,
+  },
+
+  logging: {
+    level: value.LOG_LEVEL,
+  },
 };
+
+export default config;
