@@ -1,66 +1,138 @@
-// src/config/env.js
-import dotenv from "dotenv";
+// config/env.js
 
-// Load environment variables from .env
+import dotenv from "dotenv";
+import Joi from "joi";
+
 dotenv.config();
 
-export const env = {
-  // ======================
-  // Server
-  // ======================
-  NODE_ENV: process.env.NODE_ENV || "development",
-  PORT: Number(process.env.PORT) || 6000,
+const isProd = process.env.NODE_ENV === "production";
+
+const schema = Joi.object({
+  NODE_ENV: Joi.string()
+    .valid("development", "production", "test")
+    .default("development"),
+
+  PORT: Joi.number().default(5000),
 
   // ======================
-  // Supabase (Auth + DB)
+  // CORS
   // ======================
-  SUPABASE_URL: process.env.SUPABASE_URL || "",
-  SUPABASE_SERVICE_ROLE_KEY:
-    process.env.SUPABASE_ROLE_KEY || "",
+  CORS_ORIGIN: isProd
+    ? Joi.string().uri().required()
+    : Joi.string().uri().optional(),
 
   // ======================
-  // AI / LLM (OpenRouter)
+  // AI
   // ======================
-  OPENROUTER_API_KEY:
-    process.env.OPENROUTER_KEY || "",
+  OPENROUTER_API_KEY: isProd
+    ? Joi.string().required()
+    : Joi.string().optional(),
 
-  // ✅ MUST be a VALID OpenRouter model ID
-  OPENROUTER_MODEL:
-    process.env.OPENROUTER_MODEL ||
-    "meta-llama/llama-3.1-70b-instruct",
+  OPENROUTER_MODEL: Joi.string().required(),
 
-  // ======================
-  // Weather APIs
-  // ======================
-  WEATHER_API_KEY: process.env.WEATHER_API_KEY || "",
-  OPENWEATHER_API_KEY:
-    process.env.OPENWEATHER_API_KEY || "",
+  ENABLE_STREAMING: Joi.boolean().default(true),
 
   // ======================
-  // News APIs
+  // Supabase
   // ======================
-  NEWS_API_KEY: process.env.NEWS_API_KEY || "",
-  GNEWS_API_KEY: process.env.GNEWS_API_KEY || "",
+  SUPABASE_URL: Joi.string().uri().required(),
+
+  SUPABASE_ROLE_KEY: isProd
+    ? Joi.string().required()
+    : Joi.string().optional(),
 
   // ======================
-  // Finance / Crypto
+  // Database
   // ======================
-  ALPHA_VANTAGE_KEY:
-    process.env.ALPHA_VANTAGE_KEY || "",
+  DB_USER: Joi.string().required(),
+  DB_PASSWORD: Joi.string().required(),
+  DB_HOST: Joi.string().required(),
+  DB_PORT: Joi.number().default(5432),
+  DB_NAME: Joi.string().required(),
 
   // ======================
-  // Voice / Speech
+  // Stripe
   // ======================
-  COQUI_TTS_URL:
-    process.env.COQUI_TTS_URL || "http://localhost:5002",
+  STRIPE_SECRET_KEY: isProd
+    ? Joi.string().required()
+    : Joi.string().optional(),
 
-  VOSK_MODEL_PATH:
-    process.env.VOSK_MODEL_PATH || "",
+  STRIPE_WEBHOOK_SECRET: isProd
+    ? Joi.string().required()
+    : Joi.string().optional(),
 
   // ======================
   // Security
   // ======================
-  JWT_SECRET:
-    process.env.JWT_SECRET ||
-    "CHANGE_THIS_TO_A_STRONG_SECRET"
+  JWT_SECRET: Joi.string().min(32).required(),
+  JWT_EXPIRES_IN: Joi.string().default("7d"),
+
+  RATE_LIMIT_PER_MIN: Joi.number().default(30),
+
+  // ======================
+  // Redis
+  // ======================
+  REDIS_URL: Joi.string().required(),
+
+  // ======================
+  // Logging
+  // ======================
+  LOG_LEVEL: Joi.string()
+    .valid("error", "warn", "info", "debug")
+    .default("info"),
+})
+  .unknown()
+  .required();
+
+const { error, value } = schema.validate(process.env);
+
+if (error) {
+  console.error("❌ ENV Validation Error:", error.message);
+  process.exit(1);
+}
+
+const config = {
+  env: value.NODE_ENV,
+  port: value.PORT,
+  corsOrigin: value.CORS_ORIGIN,
+
+  ai: {
+    apiKey: value.OPENROUTER_API_KEY,
+    model: value.OPENROUTER_MODEL,
+    streaming: value.ENABLE_STREAMING,
+  },
+
+  supabase: {
+    url: value.SUPABASE_URL,
+    roleKey: value.SUPABASE_ROLE_KEY,
+  },
+
+  db: {
+    user: value.DB_USER,
+    password: value.DB_PASSWORD,
+    host: value.DB_HOST,
+    port: value.DB_PORT,
+    name: value.DB_NAME,
+  },
+
+  stripe: {
+    secretKey: value.STRIPE_SECRET_KEY,
+    webhookSecret: value.STRIPE_WEBHOOK_SECRET,
+  },
+
+  security: {
+    jwtSecret: value.JWT_SECRET,
+    jwtExpiresIn: value.JWT_EXPIRES_IN,
+    rateLimit: value.RATE_LIMIT_PER_MIN,
+  },
+
+  redis: {
+    url: value.REDIS_URL,
+  },
+
+  logging: {
+    level: value.LOG_LEVEL,
+  },
 };
+
+export default config;
