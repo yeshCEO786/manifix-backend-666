@@ -1,3 +1,5 @@
+// src/app.js
+
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -17,10 +19,11 @@ if (!process.env.OPENROUTER_API_KEY) {
   console.warn("⚠️ Missing OPENROUTER_API_KEY");
 }
 
-/* ================= CORS ================= */
+/* ================= CORS (FIXED) ================= */
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "*",
+  origin: "*",
   methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
 app.use(express.json());
@@ -101,13 +104,14 @@ Make the user feel understood and slightly better.
           { role: "system", content: systemPrompt },
           { role: "user", content: message }
         ],
-        temperature: 0.8, // more human
+        temperature: 0.8,
       },
       {
         headers: {
           Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
         },
-        timeout: 15000, // 🔥 prevents hanging
+        timeout: 30000, // ✅ FIXED (important)
       }
     );
 
@@ -118,7 +122,10 @@ Make the user feel understood and slightly better.
     res.json({ reply, user });
 
   } catch (err) {
-    console.error("❌ Chat error:", err.response?.data || err.message);
+
+    /* ===== FIXED ERROR LOGGING ===== */
+    console.error("❌ FULL ERROR:");
+    console.error(err);
 
     res.status(500).json({
       reply: "⚠️ Connection issue. Try again.",
@@ -149,7 +156,6 @@ app.post("/api/magic16-complete", async (req, res) => {
 
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-
     const yDate = yesterday.toISOString().split("T")[0];
 
     streak = user?.last_streak_date === yDate ? streak + 1 : 1;
@@ -169,7 +175,7 @@ app.post("/api/magic16-complete", async (req, res) => {
     res.json({ success: true, user: updatedUser });
 
   } catch (err) {
-    console.error("Magic16 error:", err.message);
+    console.error("Magic16 error:", err);
     res.status(500).json({ error: "Update failed" });
   }
 });
@@ -179,7 +185,8 @@ app.post("/api/upload", upload.single("file"), (req, res) => {
   try {
     const url = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
     res.json({ url });
-  } catch {
+  } catch (err) {
+    console.error("Upload error:", err);
     res.status(500).json({ error: "Upload failed" });
   }
 });
@@ -195,7 +202,7 @@ app.use((req, res) => {
 
 /* ================= ERROR ================= */
 app.use((err, req, res, next) => {
-  console.error(err);
+  console.error("GLOBAL ERROR:", err);
   res.status(500).json({ error: "Server error" });
 });
 
