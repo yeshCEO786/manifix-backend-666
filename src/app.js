@@ -12,15 +12,18 @@ import stripeRouter from "./routes/stripe.js";
 dotenv.config();
 const app = express();
 
+/* ================= CONFIG CHECK ================= */
+if (!process.env.OPENROUTER_API_KEY) {
+  console.warn("⚠️ Missing OPENROUTER_API_KEY");
+}
+
 /* ================= CORS ================= */
 app.use(cors({
-  origin: "*",
+  origin: process.env.FRONTEND_URL || "*",
   methods: ["GET", "POST"],
-  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 /* ================= SUPABASE ================= */
 const supabase = createClient(
@@ -31,9 +34,8 @@ const supabase = createClient(
 /* ================= FILE UPLOAD ================= */
 const storage = multer.diskStorage({
   destination: "src/uploads",
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
+  filename: (req, file, cb) =>
+    cb(null, Date.now() + "-" + file.originalname),
 });
 
 const upload = multer({ storage });
@@ -56,7 +58,7 @@ app.post("/api/chat", async (req, res) => {
   try {
     let user = null;
 
-    // Fetch user data for AI personalization
+    /* ===== Fetch user ===== */
     if (userId) {
       const { data } = await supabase
         .from("profiles")
@@ -67,17 +69,30 @@ app.post("/api/chat", async (req, res) => {
       user = data;
     }
 
+    /* ===== SYSTEM PROMPT ===== */
     const systemPrompt = `
-You are ManifiX AI — a motivational, emotionally supportive AI.
+You are ManifiX — a deeply human, emotionally intelligent AI companion.
 
-User stats:
+User:
 - Streak: ${user?.streak || 0}
 - Energy: ${user?.energy || 0}
 - Score: ${user?.vibe_score || 0}
 
-Keep responses short, powerful, and motivating.
+Speak like a real human:
+- warm, natural, supportive
+- short (2–4 lines)
+- not robotic
+
+Adapt tone:
+- sad → calm & caring
+- motivated → energetic 🔥
+- confused → simple explanation
+
+Goal:
+Make the user feel understood and slightly better.
 `;
 
+    /* ===== AI CALL ===== */
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
@@ -85,35 +100,37 @@ Keep responses short, powerful, and motivating.
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: message }
-        ]
+        ],
+        temperature: 0.8, // more human
       },
       {
         headers: {
           Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json"
-        }
+        },
+        timeout: 15000, // 🔥 prevents hanging
       }
     );
 
     const reply =
       response.data?.choices?.[0]?.message?.content ||
-      "No response";
+      "Hmm… I couldn’t respond.";
 
     res.json({ reply, user });
 
   } catch (err) {
-    console.error("Chat error:", err.response?.data || err.message);
-    res.status(500).json({ reply: "❌ Server error" });
+    console.error("❌ Chat error:", err.response?.data || err.message);
+
+    res.status(500).json({
+      reply: "⚠️ Connection issue. Try again.",
+    });
   }
 });
 
-/* ================= MAGIC16 COMPLETE ================= */
+/* ================= MAGIC16 ================= */
 app.post("/api/magic16-complete", async (req, res) => {
   const { userId } = req.body;
 
-  if (!userId) {
-    return res.status(400).json({ error: "User ID required" });
-  }
+  if (!userId) return res.status(400).json({ error: "User ID required" });
 
   try {
     const today = new Date().toISOString().split("T")[0];
@@ -124,32 +141,26 @@ app.post("/api/magic16-complete", async (req, res) => {
       .eq("id", userId)
       .single();
 
-    let newStreak = user?.streak || 0;
+    let streak = user?.streak || 0;
 
     if (user?.last_streak_date === today) {
-      return res.json({ message: "Already completed today", user });
+      return res.json({ message: "Already completed", user });
     }
 
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
+
     const yDate = yesterday.toISOString().split("T")[0];
 
-    if (user?.last_streak_date === yDate) {
-      newStreak += 1;
-    } else {
-      newStreak = 1;
-    }
-
-    const updatedEnergy = Math.min((user?.energy || 0) + 10, 100);
-    const updatedScore = (user?.vibe_score || 0) + 5;
+    streak = user?.last_streak_date === yDate ? streak + 1 : 1;
 
     const { data: updatedUser } = await supabase
       .from("profiles")
       .update({
-        streak: newStreak,
+        streak,
         last_streak_date: today,
-        energy: updatedEnergy,
-        vibe_score: updatedScore
+        energy: Math.min((user?.energy || 0) + 10, 100),
+        vibe_score: (user?.vibe_score || 0) + 5
       })
       .eq("id", userId)
       .select()
@@ -159,17 +170,16 @@ app.post("/api/magic16-complete", async (req, res) => {
 
   } catch (err) {
     console.error("Magic16 error:", err.message);
-    res.status(500).json({ error: "Magic16 update failed" });
+    res.status(500).json({ error: "Update failed" });
   }
 });
 
-/* ================= IMAGE UPLOAD ================= */
+/* ================= UPLOAD ================= */
 app.post("/api/upload", upload.single("file"), (req, res) => {
   try {
-    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
-    res.json({ url: fileUrl });
-  } catch (err) {
-    console.error("Upload error:", err);
+    const url = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    res.json({ url });
+  } catch {
     res.status(500).json({ error: "Upload failed" });
   }
 });
@@ -180,13 +190,13 @@ app.use("/api/stripe", stripeRouter);
 
 /* ================= 404 ================= */
 app.use((req, res) => {
-  res.status(404).json({ error: "Route not found" });
+  res.status(404).json({ error: "Not found" });
 });
 
 /* ================= ERROR ================= */
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: "Internal Server Error" });
+  console.error(err);
+  res.status(500).json({ error: "Server error" });
 });
 
 export default app;
