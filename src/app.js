@@ -1,121 +1,189 @@
-// src/app.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import axios from "axios";
+import multer from "multer";
+import path from "path";
+import { createClient } from "@supabase/supabase-js";
+
 import authRoutes from "./routes/auth.routes.js";
 import stripeRouter from "./routes/stripe.js";
-import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 const app = express();
 
-/* =========================
-   Middleware
-========================= */
+/* ================= CORS ================= */
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "*", // allow frontend calls
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
+  origin: "*",
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
-app.options("*", cors()); // handle preflight requests
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* =========================
-   Supabase Client (Optional)
-========================= */
-let supabase = null;
-if (process.env.SUPABASE_URL && process.env.SUPABASE_ROLE_KEY) {
-  supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ROLE_KEY);
-} else {
-  console.warn("⚠ Supabase not configured. User stats will be disabled.");
-}
+/* ================= SUPABASE ================= */
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ROLE_KEY
+);
 
-/* =========================
-   Health Check
-========================= */
+/* ================= FILE UPLOAD ================= */
+const storage = multer.diskStorage({
+  destination: "src/uploads",
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + "-" + file.originalname);
+  },
+});
+
+const upload = multer({ storage });
+
+app.use("/uploads", express.static(path.join(process.cwd(), "src/uploads")));
+
+/* ================= HEALTH ================= */
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-/* =========================
-   Chat Route
-========================= */
+/* ================= CHAT ================= */
 app.post("/api/chat", async (req, res) => {
   const { message, userId } = req.body;
 
-  if (!message) return res.status(400).json({ reply: "Message is required" });
+  if (!message) {
+    return res.status(400).json({ reply: "Message required" });
+  }
 
   try {
-    // Optional: fetch user stats from Supabase
-    let userStats = null;
-    if (userId && supabase) {
-      const { data, error } = await supabase
+    let user = null;
+
+    // Fetch user data for AI personalization
+    if (userId) {
+      const { data } = await supabase
         .from("profiles")
-        .select("streak,last_streak_date,energy,vibe_score")
+        .select("streak, energy, vibe_score")
         .eq("id", userId)
         .single();
-      if (error) console.warn("Supabase fetch error:", error.message);
-      else userStats = data;
+
+      user = data;
     }
 
-    // OpenRouter API call
-    if (!process.env.OPENROUTER_API_KEY || !process.env.OPENROUTER_MODEL) {
-      // fallback reply
-      return res.json({ reply: "Hii ❤️ I’m ManifiX, I’m here with you ✨", userStats });
-    }
+    const systemPrompt = `
+You are ManifiX AI — a motivational, emotionally supportive AI.
+
+User stats:
+- Streak: ${user?.streak || 0}
+- Energy: ${user?.energy || 0}
+- Score: ${user?.vibe_score || 0}
+
+Keep responses short, powerful, and motivating.
+`;
 
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
         model: process.env.OPENROUTER_MODEL,
         messages: [
-          {
-            role: "system",
-            content:
-              "You are ManifiX, an emotional supportive AI companion. Short, friendly answers. Do not repeat greetings."
-          },
+          { role: "system", content: systemPrompt },
           { role: "user", content: message }
-        ],
+        ]
       },
       {
         headers: {
           Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-        },
+          "Content-Type": "application/json"
+        }
       }
     );
 
-    const reply = response.data?.choices?.[0]?.message?.content
-      || "Hmm… I couldn't generate a response.";
+    const reply =
+      response.data?.choices?.[0]?.message?.content ||
+      "No response";
 
-    res.json({ reply, userStats });
+    res.json({ reply, user });
 
   } catch (err) {
     console.error("Chat error:", err.response?.data || err.message);
-    res.status(500).json({ reply: "❌ Server Error. Please try again." });
+    res.status(500).json({ reply: "❌ Server error" });
   }
 });
 
-/* =========================
-   Other Routes
-========================= */
+/* ================= MAGIC16 COMPLETE ================= */
+app.post("/api/magic16-complete", async (req, res) => {
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ error: "User ID required" });
+  }
+
+  try {
+    const today = new Date().toISOString().split("T")[0];
+
+    const { data: user } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    let newStreak = user?.streak || 0;
+
+    if (user?.last_streak_date === today) {
+      return res.json({ message: "Already completed today", user });
+    }
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yDate = yesterday.toISOString().split("T")[0];
+
+    if (user?.last_streak_date === yDate) {
+      newStreak += 1;
+    } else {
+      newStreak = 1;
+    }
+
+    const updatedEnergy = Math.min((user?.energy || 0) + 10, 100);
+    const updatedScore = (user?.vibe_score || 0) + 5;
+
+    const { data: updatedUser } = await supabase
+      .from("profiles")
+      .update({
+        streak: newStreak,
+        last_streak_date: today,
+        energy: updatedEnergy,
+        vibe_score: updatedScore
+      })
+      .eq("id", userId)
+      .select()
+      .single();
+
+    res.json({ success: true, user: updatedUser });
+
+  } catch (err) {
+    console.error("Magic16 error:", err.message);
+    res.status(500).json({ error: "Magic16 update failed" });
+  }
+});
+
+/* ================= IMAGE UPLOAD ================= */
+app.post("/api/upload", upload.single("file"), (req, res) => {
+  try {
+    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    res.json({ url: fileUrl });
+  } catch (err) {
+    console.error("Upload error:", err);
+    res.status(500).json({ error: "Upload failed" });
+  }
+});
+
+/* ================= ROUTES ================= */
 app.use("/api/auth", authRoutes);
 app.use("/api/stripe", stripeRouter);
 
-/* =========================
-   404 Handler
-========================= */
+/* ================= 404 ================= */
 app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
-/* =========================
-   Global Error Handler
-========================= */
+/* ================= ERROR ================= */
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: "Internal Server Error" });
