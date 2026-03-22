@@ -1,23 +1,18 @@
-// config/env.js
-
 import dotenv from "dotenv";
-
 dotenv.config();
 
 const isProd = process.env.NODE_ENV === "production";
 
 // ============================
-// Helper Function
+// Helper Functions
 // ============================
 
 function required(name) {
   const value = process.env[name];
-
   if (!value) {
-    console.error(`❌ Missing required ENV variable: ${name}`);
+    console.error(`❌ Missing ENV: ${name}`);
     process.exit(1);
   }
-
   return value;
 }
 
@@ -26,7 +21,7 @@ function optional(name, defaultValue = null) {
 }
 
 // ============================
-// ENV CONFIG
+// CONFIG
 // ============================
 
 const config = {
@@ -36,7 +31,7 @@ const config = {
 
   corsOrigin: isProd
     ? required("CORS_ORIGIN")
-    : optional("CORS_ORIGIN", "manifixai.com"),
+    : optional("CORS_ORIGIN", "*"),
 
   // ============================
   // AI
@@ -49,33 +44,22 @@ const config = {
   },
 
   // ============================
-  // Supabase
+  // Supabase (CRITICAL)
   // ============================
 
   supabase: {
     url: required("SUPABASE_URL"),
-    roleKey: optional("SUPABASE_ROLE_KEY"),
+    serviceRoleKey: required("SUPABASE_ROLE_KEY"), // 🔥 must be required
   },
 
   // ============================
-  // Database
+  // Razorpay (🔥 NEW)
   // ============================
 
-  db: {
-    user: required("DB_USER"),
-    password: required("DB_PASSWORD"),
-    host: required("DB_HOST"),
-    port: optional("DB_PORT", 5432),
-    name: required("DB_NAME"),
-  },
-
-  // ============================
-  // Stripe
-  // ============================
-
-  stripe: {
-    secretKey: optional("STRIPE_SECRET_KEY"),
-    webhookSecret: optional("STRIPE_WEBHOOK_SECRET"),
+  razorpay: {
+    keyId: required("RAZORPAY_KEY"),
+    keySecret: required("RAZORPAY_SECRET"),
+    webhookSecret: optional("RAZORPAY_WEBHOOK_SECRET"),
   },
 
   // ============================
@@ -89,7 +73,7 @@ const config = {
   },
 
   // ============================
-  // Redis
+  // Redis (optional)
   // ============================
 
   redis: {
@@ -101,7 +85,7 @@ const config = {
   // ============================
 
   logging: {
-    level: optional("LOG_LEVEL", "info"),
+    level: optional("LOG_LEVEL", isProd ? "warn" : "debug"),
   },
 };
 
