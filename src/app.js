@@ -8,8 +8,9 @@ import multer from "multer";
 import path from "path";
 import { createClient } from "@supabase/supabase-js";
 
+/* ✅ ROUTES */
 import authRoutes from "./routes/auth.routes.js";
-import stripeRouter from "./routes/stripe.js";
+import razorpayRoutes from "./routes/razorpay.js"; // ✅ NEW
 
 dotenv.config();
 const app = express();
@@ -19,7 +20,7 @@ if (!process.env.OPENROUTER_API_KEY) {
   console.warn("⚠️ Missing OPENROUTER_API_KEY");
 }
 
-/* ================= CORS (FIXED) ================= */
+/* ================= CORS ================= */
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST"],
@@ -61,7 +62,6 @@ app.post("/api/chat", async (req, res) => {
   try {
     let user = null;
 
-    /* ===== Fetch user ===== */
     if (userId) {
       const { data } = await supabase
         .from("profiles")
@@ -72,30 +72,17 @@ app.post("/api/chat", async (req, res) => {
       user = data;
     }
 
-    /* ===== SYSTEM PROMPT ===== */
     const systemPrompt = `
-You are ManifiX — a deeply human, emotionally intelligent AI companion.
+You are ManifiX — a deeply human AI companion.
 
 User:
 - Streak: ${user?.streak || 0}
 - Energy: ${user?.energy || 0}
 - Score: ${user?.vibe_score || 0}
 
-Speak like a real human:
-- warm, natural, supportive
-- short (2–4 lines)
-- not robotic
-
-Adapt tone:
-- sad → calm & caring
-- motivated → energetic 🔥
-- confused → simple explanation
-
-Goal:
-Make the user feel understood and slightly better.
+Speak natural, short, human.
 `;
 
-    /* ===== AI CALL ===== */
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
@@ -111,7 +98,7 @@ Make the user feel understood and slightly better.
           Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
           "Content-Type": "application/json",
         },
-        timeout: 30000, // ✅ FIXED (important)
+        timeout: 30000,
       }
     );
 
@@ -122,10 +109,7 @@ Make the user feel understood and slightly better.
     res.json({ reply, user });
 
   } catch (err) {
-
-    /* ===== FIXED ERROR LOGGING ===== */
-    console.error("❌ FULL ERROR:");
-    console.error(err);
+    console.error("❌ FULL ERROR:", err);
 
     res.status(500).json({
       reply: "⚠️ Connection issue. Try again.",
@@ -193,7 +177,9 @@ app.post("/api/upload", upload.single("file"), (req, res) => {
 
 /* ================= ROUTES ================= */
 app.use("/api/auth", authRoutes);
-app.use("/api/stripe", stripeRouter);
+
+/* ✅ RAZORPAY ROUTES */
+app.use("/api", razorpayRoutes);
 
 /* ================= 404 ================= */
 app.use((req, res) => {
