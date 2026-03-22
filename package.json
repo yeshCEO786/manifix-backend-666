@@ -4,13 +4,16 @@
   "description": "ManifiX AI Backend API",
   "main": "server.js",
   "type": "module",
+
   "engines": {
     "node": "20.x"
   },
+
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
+
   "dependencies": {
     "@supabase/supabase-js": "^2.98.0",
     "axios": "^1.7.0",
@@ -20,10 +23,10 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^1.4.5-lts.1",
     "node-fetch": "^3.3.2",
-    "razorpay": "^2.9.6",
     "sqlite3": "^5.1.7",
     "razorpay": "^2.9.2"
   },
+
   "devDependencies": {
     "nodemon": "^3.1.0"
   }
