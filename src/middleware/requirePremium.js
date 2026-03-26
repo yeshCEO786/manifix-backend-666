@@ -1,4 +1,4 @@
-// src/middleware/requirePremium.js
+// /src/middleware/requirePremium.js
 
 /**
  * Middleware to check if a user has an active premium subscription
@@ -7,7 +7,7 @@
 
 export default async function requirePremium(req, res, next) {
   try {
-    // Make sure user info exists on the request (set by your auth middleware)
+    // Ensure user info exists (set by auth middleware)
     if (!req.user) {
       return res.status(401).json({
         error: "Authentication required. Please log in first.",
@@ -15,14 +15,14 @@ export default async function requirePremium(req, res, next) {
     }
 
     // Check if user has a premium subscription
-    // Assuming your user object has a boolean 'isPremium' or you can check subscription_status
+    // Assuming your user object has a boolean 'isPremium' or subscription status
     if (!req.user.isPremium) {
       return res.status(403).json({
         error: "Premium access required. Upgrade to premium to continue.",
       });
     }
 
-    // All good, user is premium
+    // User is premium, proceed
     next();
   } catch (err) {
     console.error("RequirePremium Middleware Error:", err);
