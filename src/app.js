@@ -22,7 +22,7 @@ if (!process.env.OPENROUTER_API_KEY) {
 
 /* ================= CORS ================= */
 app.use(cors({
-  origin: "*",
+ origin: ["https://manifixai.com"]
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
