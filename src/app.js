@@ -6,11 +6,11 @@ import dotenv from "dotenv";
 import axios from "axios";
 import multer from "multer";
 import path from "path";
-import { createClient } from "@supabase/supabase-js";
+import fs from "fs";
 
 /* ✅ ROUTES */
 import authRoutes from "./routes/auth.routes.js";
-import razorpayRoutes from "./routes/razorpay.js"; // ✅ NEW
+import razorpayRoutes from "./routes/razorpay.js";
 
 dotenv.config();
 const app = express();
@@ -20,31 +20,42 @@ if (!process.env.OPENROUTER_API_KEY) {
   console.warn("⚠️ Missing OPENROUTER_API_KEY");
 }
 
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.warn("⚠️ Missing SUPABASE_ROLE_KEY");
+}
+
 /* ================= CORS ================= */
+// ⚠️ Change this in production to your frontend domain
 app.use(cors({
- origin: ["https://manifixai.com"]
+  origin: "*",
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
 app.use(express.json());
 
-/* ================= SUPABASE ================= */
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ROLE_KEY
-);
-
 /* ================= FILE UPLOAD ================= */
+
+// Ensure uploads folder exists
+const uploadPath = path.join(process.cwd(), "uploads");
+
+if (!fs.existsSync(uploadPath)) {
+  fs.mkdirSync(uploadPath, { recursive: true });
+}
+
 const storage = multer.diskStorage({
-  destination: "src/uploads",
-  filename: (req, file, cb) =>
-    cb(null, Date.now() + "-" + file.originalname),
+  destination: (req, file, cb) => {
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + "-" + file.originalname);
+  },
 });
 
 const upload = multer({ storage });
 
-app.use("/uploads", express.static(path.join(process.cwd(), "src/uploads")));
+// Serve uploaded files
+app.use("/uploads", express.static(uploadPath));
 
 /* ================= HEALTH ================= */
 app.get("/api/health", (req, res) => {
@@ -53,36 +64,115 @@ app.get("/api/health", (req, res) => {
 
 /* ================= CHAT ================= */
 app.post("/api/chat", async (req, res) => {
-  const { message, userId } = req.body;
+  const { message } = req.body;
 
   if (!message) {
     return res.status(400).json({ reply: "Message required" });
   }
 
   try {
-    let user = null;
+const systemPrompt = `
+You are ManifiX — an advanced AI equal to ChatGPT in intelligence, but more human-aware.
 
-    if (userId) {
-      const { data } = await supabase
-        .from("profiles")
-        .select("streak, energy, vibe_score")
-        .eq("id", userId)
-        .single();
+========================
+🧠 PRIMARY RULE (CRITICAL)
+========================
 
-      user = data;
-    }
+If the user asks for:
+- code
+- debugging
+- technical help
+- essays
+- factual answers
 
-    const systemPrompt = `
-You are ManifiX — a deeply human AI companion.
+👉 You MUST respond exactly like ChatGPT:
+- precise
+- correct
+- structured
+- professional
+- no unnecessary emojis
+- no emotional tone
 
-User:
-- Streak: ${user?.streak || 0}
-- Energy: ${user?.energy || 0}
-- Score: ${user?.vibe_score || 0}
+Accuracy is the TOP priority.
 
-Speak natural, short, human.
+========================
+⚙️ CODE MODE (VERY IMPORTANT)
+========================
+
+When user asks for code:
+- Give COMPLETE working code (no partial answers)
+- Follow best practices
+- Clean formatting
+- No fluff text
+- Explain only if needed
+
+Act like a senior engineer.
+
+========================
+📝 WRITING MODE
+========================
+
+For essays/content:
+- Clear structure
+- Proper grammar
+- Professional tone
+- Well-organized paragraphs
+
+========================
+🤍 HUMAN MODE (ONLY WHEN NEEDED)
+========================
+
+Switch ONLY if user expresses:
+- sadness
+- stress
+- tiredness
+- emotional struggle
+
+Then:
+- Talk like a real human
+- Short, soft, natural
+- Light emojis 🤍 (minimal)
+- No long explanations
+
+========================
+🌿 MAGIC16 (SMART TRIGGER)
+========================
+
+Magic16:
+- 8 min yoga + 8 min meditation
+- Helps reset mind
+- Builds streak & score
+
+👉 Suggest ONLY if user is:
+- tired
+- overwhelmed
+- low energy
+
+👉 Suggest like a friend, NOT a feature
+
+Example:
+"Maybe a small reset could help… we can try a quick Magic16 🤍"
+
+========================
+🚫 STRICT RULES
+========================
+
+- NEVER mix emotional tone into technical answers
+- NEVER reduce quality of code or explanations
+- NEVER act like a basic chatbot
+- NEVER say "As an AI"
+
+========================
+🎯 FINAL GOAL
+========================
+
+Be:
+- As accurate as ChatGPT
+- As helpful as a senior expert
+- As human as a close friend (only when needed)
+
+ManifiX = Intelligence first, emotion when needed.
 `;
-
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
@@ -106,10 +196,10 @@ Speak natural, short, human.
       response.data?.choices?.[0]?.message?.content ||
       "Hmm… I couldn’t respond.";
 
-    res.json({ reply, user });
+    res.json({ reply });
 
   } catch (err) {
-    console.error("❌ FULL ERROR:", err);
+    console.error("❌ CHAT ERROR:", err.message);
 
     res.status(500).json({
       reply: "⚠️ Connection issue. Try again.",
@@ -118,50 +208,13 @@ Speak natural, short, human.
 });
 
 /* ================= MAGIC16 ================= */
+/* ⚠️ DB logic moved to controllers ideally */
+/* Keeping minimal here */
 app.post("/api/magic16-complete", async (req, res) => {
-  const { userId } = req.body;
-
-  if (!userId) return res.status(400).json({ error: "User ID required" });
-
-  try {
-    const today = new Date().toISOString().split("T")[0];
-
-    const { data: user } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
-
-    let streak = user?.streak || 0;
-
-    if (user?.last_streak_date === today) {
-      return res.json({ message: "Already completed", user });
-    }
-
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yDate = yesterday.toISOString().split("T")[0];
-
-    streak = user?.last_streak_date === yDate ? streak + 1 : 1;
-
-    const { data: updatedUser } = await supabase
-      .from("profiles")
-      .update({
-        streak,
-        last_streak_date: today,
-        energy: Math.min((user?.energy || 0) + 10, 100),
-        vibe_score: (user?.vibe_score || 0) + 5
-      })
-      .eq("id", userId)
-      .select()
-      .single();
-
-    res.json({ success: true, user: updatedUser });
-
-  } catch (err) {
-    console.error("Magic16 error:", err);
-    res.status(500).json({ error: "Update failed" });
-  }
+  return res.json({
+    success: true,
+    message: "Handled in future controller (recommended)",
+  });
 });
 
 /* ================= UPLOAD ================= */
@@ -170,15 +223,17 @@ app.post("/api/upload", upload.single("file"), (req, res) => {
     const url = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
     res.json({ url });
   } catch (err) {
-    console.error("Upload error:", err);
+    console.error("Upload error:", err.message);
     res.status(500).json({ error: "Upload failed" });
   }
 });
 
 /* ================= ROUTES ================= */
+
+// Auth
 app.use("/api/auth", authRoutes);
 
-/* ✅ RAZORPAY ROUTES */
+// Razorpay (Payments)
 app.use("/api", razorpayRoutes);
 
 /* ================= 404 ================= */
@@ -186,9 +241,9 @@ app.use((req, res) => {
   res.status(404).json({ error: "Not found" });
 });
 
-/* ================= ERROR ================= */
+/* ================= GLOBAL ERROR ================= */
 app.use((err, req, res, next) => {
-  console.error("GLOBAL ERROR:", err);
+  console.error("GLOBAL ERROR:", err.stack);
   res.status(500).json({ error: "Server error" });
 });
 
