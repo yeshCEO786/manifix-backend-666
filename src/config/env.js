@@ -1,7 +1,7 @@
 // /src/config/env.js
 import dotenv from "dotenv";
 
-// Load .env only in local development
+// Load .env immediately
 dotenv.config();
 
 const isProd = process.env.NODE_ENV === "production";
@@ -12,7 +12,8 @@ const isProd = process.env.NODE_ENV === "production";
 function required(name) {
   const value = process.env[name];
   if (!value) {
-    console.warn(`❌ WARNING: ENV variable ${name} is not set`);
+    console.error(`❌ ERROR: ENV variable ${name} is not set`);
+    process.exit(1); // Stop server if missing critical env
   }
   return value;
 }
@@ -23,22 +24,20 @@ function optional(name, defaultValue = null) {
 
 /**
  * CONFIG
- * Lazy load values to prevent build-time errors
  */
 const config = {
   env: optional("NODE_ENV", "development"),
-
   port: Number(optional("PORT", 5000)),
 
   corsOrigin: isProd
-    ? optional("CORS_ORIGIN", "https://manifixai.com")
-    : optional("CORS_ORIGIN", "http://localhost:3000"),
+    ? required("FRONTEND_URL")  // must be exact frontend domain
+    : optional("FRONTEND_URL", "http://localhost:3000"),
 
   // ============================
-  // AI
+  // AI / GPT
   // ============================
   ai: {
-    apiKey: optional("OPENROUTER_API_KEY"),
+    apiKey: required("OPENROUTER_API_KEY"),
     model: optional("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
     streaming: optional("ENABLE_STREAMING", "true") === "true",
   },
@@ -47,16 +46,16 @@ const config = {
   // Supabase
   // ============================
   supabase: {
-    url: optional("SUPABASE_URL"),
-    serviceRoleKey: optional("SUPABASE_ROLE_KEY"),
+    url: required("SUPABASE_URL"),
+    serviceRoleKey: required("SUPABASE_ROLE_KEY"),
   },
 
   // ============================
   // Razorpay
   // ============================
   razorpay: {
-    keyId: optional("RAZORPAY_KEY_ID"),
-    keySecret: optional("RAZORPAY_KEY_SECRET"),
+    keyId: required("RAZORPAY_KEY_ID"),
+    keySecret: required("RAZORPAY_KEY_SECRET"),
     webhookSecret: optional("RAZORPAY_WEBHOOK_SECRET"),
   },
 
@@ -64,7 +63,7 @@ const config = {
   // Security / JWT
   // ============================
   security: {
-    jwtSecret: optional("JWT_SECRET"),
+    jwtSecret: required("JWT_SECRET"),
     jwtExpiresIn: optional("JWT_EXPIRES_IN", "7d"),
     rateLimit: Number(optional("RATE_LIMIT_PER_MIN", 30)),
   },
