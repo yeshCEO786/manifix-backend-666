@@ -1,60 +1,31 @@
-// backend/jobs/expirePremium.js
-import { createClient } from "@supabase/supabase-js";
-import cron from "node-cron";
-import dotenv from "dotenv";
-
-dotenv.config();
-
-// 🔐 Initialize Supabase (server-side)
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ROLE_KEY
-);
+// src/middleware/requirePremium.js
 
 /**
- * Expire premium subscriptions past their expiry date
+ * Middleware to check if a user has an active premium subscription
+ * Usage: import requirePremium from "../middleware/requirePremium.js";
  */
-async function expirePremiumSubscriptions() {
+
+export default async function requirePremium(req, res, next) {
   try {
-    const now = new Date().toISOString();
-
-    // Fetch all active premium users whose expiry is past
-    const { data: expiredUsers, error } = await supabase
-      .from("premium")
-      .select("*")
-      .eq("subscription_status", "active")
-      .lt("expires_at", now);
-
-    if (error) throw error;
-
-    if (!expiredUsers || expiredUsers.length === 0) {
-      console.log("🕒 No premium subscriptions to expire today");
-      return;
+    // Make sure user info exists on the request (set by your auth middleware)
+    if (!req.user) {
+      return res.status(401).json({
+        error: "Authentication required. Please log in first.",
+      });
     }
 
-    // Update their subscription_status to "expired"
-    const { error: updateError } = await supabase
-      .from("premium")
-      .update({ subscription_status: "expired" })
-      .lt("expires_at", now)
-      .eq("subscription_status", "active");
+    // Check if user has a premium subscription
+    // Assuming your user object has a boolean 'isPremium' or you can check subscription_status
+    if (!req.user.isPremium) {
+      return res.status(403).json({
+        error: "Premium access required. Upgrade to premium to continue.",
+      });
+    }
 
-    if (updateError) throw updateError;
-
-    console.log(
-      `✅ Expired ${expiredUsers.length} premium subscription(s):`,
-      expiredUsers.map((u) => u.user_id)
-    );
+    // All good, user is premium
+    next();
   } catch (err) {
-    console.error("❌ Expire Premium Job Error:", err.message || err);
+    console.error("RequirePremium Middleware Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 }
-
-// ⏰ Schedule job: run every day at midnight
-cron.schedule("0 0 * * *", () => {
-  console.log("🕒 Running daily expirePremium cron job...");
-  expirePremiumSubscriptions();
-});
-
-// 🔥 Optional: run immediately on server start
-expirePremiumSubscriptions();
