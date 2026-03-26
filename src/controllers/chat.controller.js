@@ -1,5 +1,5 @@
 import fetch from "node-fetch";
-import { env } from "../config/env.js";
+import  env  from "../config/env.js";
 
 export const chatController = async (req, res) => {
   try {
