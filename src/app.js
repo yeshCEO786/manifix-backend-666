@@ -8,7 +8,7 @@ import path from "path";
 import fs from "fs";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-
+import webhookRoutes from "./routes/webhook.routes.js";
 /* ✅ ROUTES */
 import authRoutes from "./routes/auth.routes.js";
 import razorpayRoutes from "./routes/razorpay.js";
@@ -28,7 +28,7 @@ const limiter = rateLimit({
   max: 100, // limit each IP
 });
 app.use(limiter);
-
+import webhookRoutes from "./routes/webhook.routes.js";
 /* ================= CONFIG CHECK ================= */
 
 if (!process.env.OPENROUTER_API_KEY) {
