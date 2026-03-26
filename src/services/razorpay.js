@@ -1,27 +1,27 @@
 // /src/services/razorpay.js
 import Razorpay from "razorpay";
+import config from "../config/env.js";
 
 /**
  * Create and return a Razorpay client
  * ⚠️ Always call inside a function or server start
  */
 export function createRazorpayClient() {
-  const { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET } = process.env;
+  const { keyId, keySecret } = config.razorpay;
 
-  if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
-    throw new Error("❌ Missing ENV: RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET");
+  if (!keyId || !keySecret) {
+    throw new Error(
+      "❌ Missing ENV: RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET"
+    );
   }
 
-  return new Razorpay({
-    key_id: RAZORPAY_KEY_ID,
-    key_secret: RAZORPAY_KEY_SECRET,
-  });
+  return new Razorpay({ key_id: keyId, key_secret: keySecret });
 }
 
 /**
- * Example function to create an order
+ * Create a Razorpay order
  * @param {number} amount - Amount in smallest currency unit (paise)
- * @param {string} currency - Currency code (INR, USD, etc.)
+ * @param {string} currency - Currency code (default: INR)
  */
 export async function createRazorpayOrder(amount, currency = "INR") {
   const client = createRazorpayClient();
@@ -32,14 +32,25 @@ export async function createRazorpayOrder(amount, currency = "INR") {
     payment_capture: 1, // auto-capture
   };
 
-  return await client.orders.create(options);
+  try {
+    return await client.orders.create(options);
+  } catch (err) {
+    console.error("Razorpay order creation failed:", err.message);
+    throw err;
+  }
 }
 
 /**
- * Example function to fetch a payment by ID
+ * Fetch a payment by ID
  * @param {string} paymentId
  */
 export async function fetchPayment(paymentId) {
   const client = createRazorpayClient();
-  return await client.payments.fetch(paymentId);
+
+  try {
+    return await client.payments.fetch(paymentId);
+  } catch (err) {
+    console.error("Razorpay fetch payment failed:", err.message);
+    throw err;
+  }
 }
