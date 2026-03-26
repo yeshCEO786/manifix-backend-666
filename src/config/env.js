@@ -1,3 +1,5 @@
+// src/config/env.js
+
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -17,7 +19,7 @@ function required(name) {
 }
 
 function optional(name, defaultValue = null) {
-  return process.env[name] || defaultValue;
+  return process.env[name] ?? defaultValue;
 }
 
 // ============================
@@ -27,11 +29,11 @@ function optional(name, defaultValue = null) {
 const config = {
   env: optional("NODE_ENV", "development"),
 
-  port: optional("PORT", 5000),
+  port: Number(optional("PORT", 5000)),
 
   corsOrigin: isProd
     ? required("CORS_ORIGIN")
-    : optional("CORS_ORIGIN", "*"),
+    : optional("CORS_ORIGIN", "https://manifixai.com"),
 
   // ============================
   // AI
@@ -44,21 +46,21 @@ const config = {
   },
 
   // ============================
-  // Supabase (CRITICAL)
+  // Supabase
   // ============================
 
   supabase: {
     url: required("SUPABASE_URL"),
-    serviceRoleKey: required("SUPABASE_ROLE_KEY"), // 🔥 must be required
+    serviceRoleKey: required("SUPABASE_ROLE_KEY"),
   },
 
   // ============================
-  // Razorpay (🔥 NEW)
+  // Razorpay ✅ FIXED
   // ============================
 
   razorpay: {
-    keyId: required("RAZORPAY_KEY"),
-    keySecret: required("RAZORPAY_SECRET"),
+    keyId: required("RAZORPAY_KEY_ID"),
+    keySecret: required("RAZORPAY_KEY_SECRET"),
     webhookSecret: optional("RAZORPAY_WEBHOOK_SECRET"),
   },
 
@@ -69,7 +71,7 @@ const config = {
   security: {
     jwtSecret: required("JWT_SECRET"),
     jwtExpiresIn: optional("JWT_EXPIRES_IN", "7d"),
-    rateLimit: optional("RATE_LIMIT_PER_MIN", 30),
+    rateLimit: Number(optional("RATE_LIMIT_PER_MIN", 30)),
   },
 
   // ============================
