@@ -7,9 +7,9 @@ const isProd = process.env.NODE_ENV === "production";
 function required(name) {
   const value = process.env[name];
   if (!value) {
-    throw new Error(`❌ Missing ENV variable: ${name}`);
+    console.warn(`❌ WARNING: ENV variable ${name} is not set`);
   }
-  return value;
+  return value || "";
 }
 
 function optional(name, defaultValue = null) {
@@ -21,7 +21,7 @@ const config = {
   port: Number(optional("PORT", 5000)),
 
   corsOrigin: isProd
-    ? required("FRONTEND_URL")
+    ? optional("FRONTEND_URL", "https://manifixai.com")
     : optional("FRONTEND_URL", "http://localhost:3000"),
 
   ai: {
