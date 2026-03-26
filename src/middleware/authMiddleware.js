@@ -3,8 +3,8 @@ import jwt from "jsonwebtoken";
 export const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader) {
-    return res.status(401).json({ message: "No token provided" });
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "No token provided or malformed" });
   }
 
   const token = authHeader.split(" ")[1];
@@ -14,6 +14,10 @@ export const verifyToken = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
+    console.error("JWT verification error:", error.message);
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ message: "Token expired" });
+    }
     return res.status(403).json({ message: "Invalid token" });
   }
 };
