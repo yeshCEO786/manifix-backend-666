@@ -8,11 +8,11 @@ import path from "path";
 import fs from "fs";
 
 /* ================= ROUTES ================= */
-import webhookRoutes from "./routes/webhook.routes.js";
-import authRoutes from "./routes/auth.routes.js";
-import razorpayRoutes from "./routes/razorpay.js";
 import chatRoutes from "./routes/chat.routes.js";
+import authRoutes from "./routes/auth.routes.js";
 import premiumRoutes from "./routes/premium.routes.js";
+import razorpayRoutes from "./routes/razorpay.js";
+import webhookRoutes from "./routes/webhook.routes.js";
 import requirePremium from "./middleware/requirePremium.js";
 
 /* ================= CONFIG ================= */
@@ -49,23 +49,22 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadPath),
   filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
 });
-
 const upload = multer({ storage });
 app.use("/uploads", express.static(uploadPath));
 
 /* ================= HEALTH CHECK ================= */
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 
-/* ================= ROUTES ================= */
+/* ================= API ROUTES ================= */
 app.use("/api/chat", chatRoutes);               // GPT conversation
-app.use("/api/auth", authRoutes);              // Auth
-app.use("/api", razorpayRoutes);               // Razorpay
+app.use("/api/auth", authRoutes);              // Authentication
+app.use("/api", razorpayRoutes);               // Razorpay orders
 app.use("/api", webhookRoutes);                // Razorpay webhooks
 
-/* ================= PREMIUM ================= */
+/* ================= PREMIUM ROUTES ================= */
 app.use("/api/premium", requirePremium, premiumRoutes);
 
-/* ================= MAGIC16 ================= */
+/* ================= MAGIC16 ROUTE ================= */
 app.post("/api/magic16-complete", async (req, res) => {
   return res.json({
     success: true,
@@ -84,10 +83,10 @@ app.post("/api/upload", upload.single("file"), (req, res) => {
   }
 });
 
-/* ================= 404 ================= */
+/* ================= 404 HANDLER ================= */
 app.use((req, res) => res.status(404).json({ error: "Route not found" }));
 
-/* ================= GLOBAL ERROR ================= */
+/* ================= GLOBAL ERROR HANDLER ================= */
 app.use((err, req, res, next) => {
   console.error("GLOBAL ERROR:", err.stack);
   res.status(err.status || 500).json({ error: err.message || "Internal server error" });
