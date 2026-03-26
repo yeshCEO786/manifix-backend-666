@@ -8,8 +8,9 @@ import path from "path";
 import fs from "fs";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import webhookRoutes from "./routes/webhook.routes.js";
+
 /* ✅ ROUTES */
+import webhookRoutes from "./routes/webhook.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import razorpayRoutes from "./routes/razorpay.js";
 import chatRoutes from "./routes/chat.routes.js";
@@ -19,33 +20,38 @@ const app = express();
 
 /* ================= SECURITY ================= */
 
-// Helmet (secure headers)
 app.use(helmet());
 
-// Rate limiting (protect API)
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 mins
-  max: 100, // limit each IP
+  windowMs: 15 * 60 * 1000,
+  max: 100,
 });
 app.use(limiter);
-import webhookRoutes from "./routes/webhook.routes.js";
+
 /* ================= CONFIG CHECK ================= */
 
 if (!process.env.OPENROUTER_API_KEY) {
   console.warn("⚠️ Missing OPENROUTER_API_KEY");
 }
 
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+if (!process.env.SUPABASE_ROLE_KEY) {
   console.warn("⚠️ Missing SUPABASE_ROLE_KEY");
 }
 
 /* ================= CORS ================= */
 
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "*", // 🔥 set domain in prod
+  origin: process.env.FRONTEND_URL || "*",
   methods: ["GET", "POST", "PUT", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
+
+/* ================= WEBHOOK FIRST (IMPORTANT) ================= */
+
+// ✅ MUST be before express.json()
+app.use("/api", webhookRoutes);
+
+/* ================= BODY PARSER ================= */
 
 app.use(express.json({ limit: "10mb" }));
 
@@ -75,13 +81,8 @@ app.get("/api/health", (req, res) => {
 
 /* ================= ROUTES ================= */
 
-// 🔥 AI Chat (CLEAN)
 app.use("/api/chat", chatRoutes);
-
-// Auth
 app.use("/api/auth", authRoutes);
-
-// Payments
 app.use("/api", razorpayRoutes);
 
 /* ================= MAGIC16 ================= */
