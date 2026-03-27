@@ -1,6 +1,5 @@
-// /src/config/env.js
 import dotenv from "dotenv";
-dotenv.config(); // always load first
+dotenv.config();
 
 const isProd = process.env.NODE_ENV === "production";
 
