@@ -1,4 +1,3 @@
-// src/app.js
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -21,14 +20,13 @@ import config from "./config/env.js";
 const app = express();
 
 /* ================= TRUST PROXY ================= */
-// Needed for proper IP detection (rate-limit) on Railway/Vercel
-app.set("trust proxy", 1);
+app.set("trust proxy", 1); // important for Railway/Vercel
 
 /* ================= SECURITY ================= */
 app.use(helmet());
 app.use(
   rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
+    windowMs: 15 * 60 * 1000,
     max: config.security.rateLimit || 100,
     message: "⚠️ Too many requests from this IP, please try again later.",
   })
@@ -62,15 +60,15 @@ app.use("/uploads", express.static(uploadPath));
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 
 /* ================= API ROUTES ================= */
-app.use("/api/chat", chatRoutes);        // GPT conversation
-app.use("/api/auth", authRoutes);        // Authentication
-app.use("/api", razorpayRoutes);         // Razorpay orders
-app.use("/api", webhookRoutes);          // Razorpay webhooks
+app.use("/api/chat", chatRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api", razorpayRoutes);
+app.use("/api", webhookRoutes);
 
 /* ================= PREMIUM ROUTES ================= */
 app.use("/api/premium", requirePremium, premiumRoutes);
 
-/* ================= MAGIC16 ROUTE ================= */
+/* ================= MAGIC16 ================= */
 app.post("/api/magic16-complete", async (req, res) => {
   return res.json({
     success: true,
@@ -78,7 +76,7 @@ app.post("/api/magic16-complete", async (req, res) => {
   });
 });
 
-/* ================= FILE UPLOAD ENDPOINT ================= */
+/* ================= FILE UPLOAD ================= */
 app.post("/api/upload", upload.single("file"), (req, res) => {
   try {
     const url = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
@@ -89,10 +87,10 @@ app.post("/api/upload", upload.single("file"), (req, res) => {
   }
 });
 
-/* ================= 404 HANDLER ================= */
+/* ================= 404 ================= */
 app.use((req, res) => res.status(404).json({ error: "Route not found" }));
 
-/* ================= GLOBAL ERROR HANDLER ================= */
+/* ================= GLOBAL ERROR ================= */
 app.use((err, req, res, next) => {
   console.error("GLOBAL ERROR:", err.stack);
   res.status(err.status || 500).json({ error: err.message || "Internal server error" });
