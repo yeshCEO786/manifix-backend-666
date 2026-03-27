@@ -1,4 +1,4 @@
-// /src/app.js
+// src/app.js
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -20,19 +20,24 @@ import config from "./config/env.js";
 
 const app = express();
 
+/* ================= TRUST PROXY ================= */
+// Needed for proper IP detection (rate-limit) on Railway/Vercel
+app.set("trust proxy", 1);
+
 /* ================= SECURITY ================= */
 app.use(helmet());
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: config.security.rateLimit,
+    max: config.security.rateLimit || 100,
+    message: "Too many requests from this IP, please try again later.",
   })
 );
 
 /* ================= CORS ================= */
 app.use(
   cors({
-    origin: config.corsOrigin,
+    origin: config.corsOrigin || "*",
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
@@ -40,6 +45,7 @@ app.use(
 
 /* ================= BODY PARSER ================= */
 app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
 
 /* ================= FILE UPLOAD ================= */
 const uploadPath = path.join(process.cwd(), "uploads");
@@ -56,10 +62,10 @@ app.use("/uploads", express.static(uploadPath));
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 
 /* ================= API ROUTES ================= */
-app.use("/api/chat", chatRoutes);               // GPT conversation
-app.use("/api/auth", authRoutes);              // Authentication
-app.use("/api", razorpayRoutes);               // Razorpay orders
-app.use("/api", webhookRoutes);                // Razorpay webhooks
+app.use("/api/chat", chatRoutes);        // GPT conversation
+app.use("/api/auth", authRoutes);        // Authentication
+app.use("/api", razorpayRoutes);         // Razorpay orders
+app.use("/api", webhookRoutes);          // Razorpay webhooks
 
 /* ================= PREMIUM ROUTES ================= */
 app.use("/api/premium", requirePremium, premiumRoutes);
