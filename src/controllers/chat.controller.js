@@ -1,18 +1,19 @@
 import fetch from "node-fetch";
-import  env  from "../config/env.js";
+import env from "../config/env.js";
 
 export const chatController = async (req, res) => {
   try {
     const { message, conversation = [] } = req.body;
 
     if (!message) {
-      return res.status(400).json({ error: "Message is required" });
+      return res.status(400).json({ reply: "Message is required" });
     }
 
     const messages = [
       {
         role: "system",
-        content: `You are ManifiX — an advanced AI equal to ChatGPT in intelligence, but more human-aware.
+        content: 
+      `You are ManifiX — an advanced AI equal to ChatGPT in intelligence, but more human-aware.
 
 ========================
 🧠 PRIMARY RULE (CRITICAL)
@@ -117,40 +118,46 @@ ManifiX = Intelligence first, emotion when needed.`
       { role: "user", content: message }
     ];
 
-const response = await fetch(
-  "https://openrouter.ai/api/v1/chat/completions",
-  {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.ai.apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": "https://manifix.app",
-      "X-Title": "ManifiX"
-    },
-    body: JSON.stringify({
-      model: config.ai.model,
-      messages,
-      temperature: 0.7
-    })
-  }
-);
-    
-const data = await response.json();
-if (!response.ok) {
-  console.error("OpenRouter Error:", data);
-  return res.status(500).json({
-    error: data?.error?.message || "AI failed"
-  });
-}
-   const reply =
-  data?.choices?.[0]?.message?.content ||
-  data?.choices?.[0]?.text ||
-  "I’m here with you. Tell me more 🤍";
+    const response = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.ai.apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://manifix.app",
+          "X-Title": "ManifiX"
+        },
+        body: JSON.stringify({
+          model: env.ai.model,
+          messages,
+          temperature: 0.7
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    // ❌ HANDLE ERROR FIRST
+    if (!response.ok) {
+      console.error("OpenRouter Error:", data);
+      return res.status(500).json({
+        reply: data?.error?.message || "⚠️ AI failed. Try again."
+      });
+    }
+
+    // ✅ THEN PROCESS SUCCESS
+    const reply =
+      data?.choices?.[0]?.message?.content ||
+      data?.choices?.[0]?.text ||
+      "I’m here with you. Tell me more 🤍";
 
     return res.json({ reply });
 
   } catch (err) {
     console.error("ChatController error:", err);
-    return res.status(500).json({ error: "AI failed" });
+    return res.status(500).json({
+      reply: "⚠️ Server error. Try again."
+    });
   }
 };
