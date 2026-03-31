@@ -117,24 +117,23 @@ ManifiX = Intelligence first, emotion when needed.`
       { role: "user", content: message }
     ];
 
-     const response = await fetch(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://manifix.app", // 🔥 REQUIRED
-          "X-Title": "ManifiX" // 🔥 REQUIRED
-        },
-        body: JSON.stringify({
-         model: "mistralai/mistral-7b-instruct",
-          messages,
-          temperature: 0.7
-        })
-      }
-    );
-
+const response = await fetch(
+  "https://openrouter.ai/api/v1/chat/completions",
+  {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.ai.apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://manifix.app",
+      "X-Title": "ManifiX"
+    },
+    body: JSON.stringify({
+      model: config.ai.model,
+      messages,
+      temperature: 0.7
+    })
+  }
+);
     
 const data = await response.json();
 if (!response.ok) {
