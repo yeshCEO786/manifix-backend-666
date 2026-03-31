@@ -117,27 +117,36 @@ ManifiX = Intelligence first, emotion when needed.`
       { role: "user", content: message }
     ];
 
-    const response = await fetch(
+     const response = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
       {
         method: "POST",
         headers: {
           Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://manifix.app", // 🔥 REQUIRED
+          "X-Title": "ManifiX" // 🔥 REQUIRED
         },
         body: JSON.stringify({
-          model: "openai/gpt-4o-mini",
+         model: "mistralai/mistral-7b-instruct",
           messages,
           temperature: 0.7
         })
       }
     );
 
-    const data = await response.json();
-
-    const reply =
-      data?.choices?.[0]?.message?.content ||
-      "I’m here with you. Tell me more 🤍";
+    
+const data = await response.json();
+if (!response.ok) {
+  console.error("OpenRouter Error:", data);
+  return res.status(500).json({
+    error: data?.error?.message || "AI failed"
+  });
+}
+   const reply =
+  data?.choices?.[0]?.message?.content ||
+  data?.choices?.[0]?.text ||
+  "I’m here with you. Tell me more 🤍";
 
     return res.json({ reply });
 
