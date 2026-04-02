@@ -12,6 +12,7 @@ import authRoutes from "./routes/auth.routes.js";
 import premiumRoutes from "./routes/premium.routes.js";
 import razorpayRoutes from "./routes/razorpay.js";
 import webhookRoutes from "./routes/webhook.routes.js";
+import feedbackRoutes from "./routes/feedback.routes.js";
 import requirePremium from "./middleware/requirePremium.js";
 
 /* ================= CONFIG ================= */
@@ -60,6 +61,7 @@ app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 /* ================= API ROUTES ================= */
 app.use("/api/chat", chatRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/feedback", feedbackRoutes); // ✅ HERE
 app.use("/api", razorpayRoutes);
 app.use("/api", webhookRoutes);
 
