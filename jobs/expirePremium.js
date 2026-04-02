@@ -8,7 +8,7 @@ dotenv.config();
 // 🔐 Initialize Supabase (server-side)
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_ROLE_KEY
+  process.env.SUPABASE_ANON_KEY
 );
 
 /**
