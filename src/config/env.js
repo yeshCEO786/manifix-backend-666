@@ -31,7 +31,7 @@ const config = {
 
   supabase: {
     url: required("SUPABASE_URL"),
-    serviceRoleKey: required("SUPABASE_ROLE_KEY"),
+    serviceRoleKey: required("SUPABASE_ANON_KEY"),
   },
 
   razorpay: {
