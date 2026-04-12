@@ -1,22 +1,49 @@
 import { serve } from "https://deno.land/std/http/server.ts";
 
 serve(async () => {
-  const now = new Date();
-  const hour = now.getHours();
+  try {
+    const now = new Date();
+    const hour = now.getHours();
 
-  // 🔥 Fetch users
-  const res = await fetch("YOUR_SUPABASE_REST_URL/user_preferences");
-  const users = await res.json();
+    console.log("⏰ Running at hour:", hour);
 
-  for (const user of users) {
-    if (!user.push_enabled) continue;
+    /* 🔥 FETCH USERS FROM SUPABASE */
+    const res = await fetch(
+      "https://YOUR_PROJECT_ID.supabase.co/rest/v1/user_preferences",
+      {
+        headers: {
+          apikey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+          Authorization: `Bearer ${Deno.env.get(
+            "SUPABASE_SERVICE_ROLE_KEY"
+          )}`,
+        },
+      }
+    );
 
-    if (hour >= user.notif_start && hour < user.notif_end) {
-      console.log("Send notification to:", user.user_id);
+    const users = await res.json();
 
-      // 👉 call push logic here
+    for (const user of users) {
+      if (!user.push_enabled) continue;
+
+      if (hour >= user.notif_start && hour < user.notif_end) {
+        console.log("🔥 Send notification to:", user.user_id);
+
+        /* 🚀 TEMP TEST LOG */
+        // later: real push here
+      }
     }
-  }
 
-  return new Response("done");
+    return new Response(
+      JSON.stringify({ success: true }),
+      { headers: { "Content-Type": "application/json" } }
+    );
+
+  } catch (err) {
+    console.error("❌ Error:", err);
+
+    return new Response(
+      JSON.stringify({ error: "Something went wrong" }),
+      { status: 500 }
+    );
+  }
 });
