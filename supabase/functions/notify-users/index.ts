@@ -12,9 +12,9 @@ serve(async () => {
       "https://YOUR_PROJECT_ID.supabase.co/rest/v1/user_preferences",
       {
         headers: {
-          apikey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+          apikey: Deno.env.get("SUPABASE_ANON_KEY")!,
           Authorization: `Bearer ${Deno.env.get(
-            "SUPABASE_SERVICE_ROLE_KEY"
+            "SUPABASE_ANON_KEY"
           )}`,
         },
       }
