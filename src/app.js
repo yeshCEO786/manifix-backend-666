@@ -14,6 +14,8 @@ import razorpayRoutes from "./routes/razorpay.js";
 import webhookRoutes from "./routes/webhook.routes.js";
 import feedbackRoutes from "./routes/feedback.routes.js";
 import requirePremium from "./middleware/requirePremium.js";
+import streamRoutes from "./routes/stream.routes.js";
+
 
 /* ================= CONFIG ================= */
 import config from "./config/env.js";
@@ -79,7 +81,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api", razorpayRoutes);
 app.use("/api", webhookRoutes);
-
+app.use("/api/stream", streamRoutes);
 /* ================= PREMIUM ================= */
 app.use("/api/premium", requirePremium, premiumRoutes);
 
