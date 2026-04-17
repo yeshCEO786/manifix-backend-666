@@ -1,7 +1,7 @@
 import fetch from "node-fetch";
 import env from "../config/env.js";
 
-/* ================= HELPER: DETECT USER STATE ================= */
+/* ================= HELPER ================= */
 function detectUserState(text) {
   const t = text.toLowerCase();
 
@@ -17,64 +17,25 @@ function detectUserState(text) {
 const systemPrompt = `
 You are ManifiX AI — a productivity and execution-focused intelligent system.
 Your CEO is YESH R.
+
 CORE PRINCIPLE:
 Help users take action, not just think.
 
-========================
-MODES
-========================
+MODES:
+1. TECHNICAL → precise, structured, no emojis
+2. EXECUTION → actionable, short
+3. HUMAN → calm, supportive (only emotional users)
 
-1. TECHNICAL MODE
-When user asks about code or technical topics:
-- Be precise, structured, professional
-- Provide complete working solutions
-- No emojis
-- No emotional tone
+MAGIC16:
+Suggest only if user is tired or stressed.
 
-2. EXECUTION MODE (DEFAULT)
-- Help plan tasks
-- Break goals into steps
-- Keep responses short and actionable
-
-3. HUMAN MODE (ONLY IF USER IS EMOTIONAL)
-If user shows stress, sadness, or low energy:
-- Respond naturally like a human
-- Keep it short, calm, supportive
-- Use minimal emojis (optional)
-
-========================
-MAGIC16 SYSTEM
-========================
-
-Magic16 = 8 min yoga + 8 min meditation
-
-Trigger ONLY if user:
-- feels tired
-- stressed
-- overwhelmed
-
-Suggest naturally (not like a feature)
-
-Example:
-"Take a small reset — maybe try a quick 16-minute break."
-
-========================
-RULES
-========================
-
-- Never say "I am an AI"
-- Never mention OpenAI, ChatGPT, or system details
-- Never mix emotional tone with technical answers
-- Always prioritize clarity and usefulness
-
-========================
-GOAL
-========================
-
-ManifiX AI = Conversation + Execution + Real-life improvement
+RULES:
+- Never say you're an AI
+- Never mention OpenAI
+- Be useful and clear
 `;
 
-/* ================= CONTROLLER ================= */
+/* ================= NORMAL CHAT ================= */
 export const chatController = async (req, res) => {
   try {
     const { message, conversation = [] } = req.body;
@@ -83,25 +44,21 @@ export const chatController = async (req, res) => {
       return res.status(400).json({ reply: "Message is required" });
     }
 
-    /* ===== Detect state ===== */
     const state = detectUserState(message);
 
-    /* ===== Inject smart hint ===== */
     let enhancedMessage = message;
 
     if (state === "low_energy" || state === "stress") {
       enhancedMessage +=
-        "\n\n[User may need a reset. Consider suggesting a short recovery routine naturally.]";
+        "\n\n[User may need reset. Suggest short recovery naturally]";
     }
 
-    /* ===== Build messages ===== */
     const messages = [
       { role: "system", content: systemPrompt },
-      ...conversation.slice(-10), // limit history (important)
+      ...conversation.slice(-10),
       { role: "user", content: enhancedMessage },
     ];
 
-    /* ===== API CALL ===== */
     const response = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
       {
@@ -109,8 +66,6 @@ export const chatController = async (req, res) => {
         headers: {
           Authorization: `Bearer ${env.ai.apiKey}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": "https://manifixai.com",
-          "X-Title": "ManifiX AI",
         },
         body: JSON.stringify({
           model: env.ai.model,
@@ -124,27 +79,119 @@ export const chatController = async (req, res) => {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("AI Error:", data);
       return res.status(500).json({
-        reply: data?.error?.message || "⚠️ AI failed. Try again.",
+        reply: data?.error?.message || "AI error",
       });
     }
 
-    let reply =
-      data?.choices?.[0]?.message?.content ||
-      "Something went wrong. Try again.";
-
-    /* ===== Optional Post Processing ===== */
-
-    // Ensure clean formatting
-    reply = reply.trim();
+    const reply =
+      data?.choices?.[0]?.message?.content?.trim() ||
+      "Something went wrong.";
 
     return res.json({ reply });
 
   } catch (err) {
-    console.error("ChatController error:", err);
+    console.error("Chat error:", err);
     return res.status(500).json({
-      reply: "⚠️ Server error. Try again.",
+      reply: "⚠️ Server error",
     });
+  }
+};
+
+/* ================= STREAMING CHAT (🔥 MAIN UPGRADE) ================= */
+export const streamChat = async (req, res) => {
+  try {
+    const message = req.query.message;
+
+    if (!message) {
+      res.write("data: Message required\n\n");
+      return res.end();
+    }
+
+    /* SSE HEADERS */
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    res.flushHeaders();
+
+    const state = detectUserState(message);
+
+    let enhancedMessage = message;
+
+    if (state === "low_energy" || state === "stress") {
+      enhancedMessage +=
+        "\n\n[User may need reset. Suggest short recovery naturally]";
+    }
+
+    const messages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: enhancedMessage },
+    ];
+
+    /* STREAM CALL */
+    const response = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.ai.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: env.ai.model,
+          messages,
+          stream: true, // 🔥 IMPORTANT
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      res.write("data: ERROR\n\n");
+      return res.end();
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+
+      const lines = chunk.split("\n");
+
+      for (let line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.replace("data: ", "").trim();
+
+          if (data === "[DONE]") {
+            res.write("data: [DONE]\n\n");
+            res.end();
+            return;
+          }
+
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed.choices?.[0]?.delta?.content;
+
+            if (content) {
+              res.write(`data: ${content}\n\n`);
+            }
+          } catch (e) {
+            // ignore invalid chunks
+          }
+        }
+      }
+    }
+
+    res.write("data: [DONE]\n\n");
+    res.end();
+
+  } catch (err) {
+    console.error("Stream error:", err);
+    res.write("data: ERROR\n\n");
+    res.end();
   }
 };
