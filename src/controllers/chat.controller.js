@@ -1,8 +1,8 @@
 import fetch from "node-fetch";
 import env from "../config/env.js";
 
-/* ================= HELPER ================= */
-function detectUserState(text) {
+/* ================= USER STATE DETECTION ================= */
+function detectUserState(text = "") {
   const t = text.toLowerCase();
 
   if (t.match(/tired|exhausted|low energy|sleepy/)) return "low_energy";
@@ -13,13 +13,14 @@ function detectUserState(text) {
   return "normal";
 }
 
+/* ================= SYSTEM PROMPT ================= */
 const systemPrompt = `
 You are ManifiX AI, a helpful and intelligent assistant.
 
 Style:
 - Clear, natural, and conversational
 - Not robotic, not overly dramatic
-- Helpful and concise
+- Concise but complete
 
 Behavior:
 - Answer directly and truthfully
@@ -52,12 +53,17 @@ export const chatController = async (req, res) => {
 
     if (state === "low_energy" || state === "stress") {
       enhancedMessage +=
-        "\n\n[User may need reset. Suggest short recovery naturally]";
+        "\n\n[User may benefit from a short reset suggestion]";
     }
+
+    /* 🎯 Smart temperature */
+    let temperature = 0.6;
+    if (state === "technical") temperature = 0.2;
+    if (state === "emotional") temperature = 0.7;
 
     const messages = [
       { role: "system", content: systemPrompt },
-      ...conversation.slice(-10),
+      ...conversation.slice(-6),
       { role: "user", content: enhancedMessage },
     ];
 
@@ -72,13 +78,18 @@ export const chatController = async (req, res) => {
         body: JSON.stringify({
           model: env.ai.model,
           messages,
-          temperature: 0.6,
+          temperature,
           max_tokens: 800,
         }),
       }
     );
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      return res.status(500).json({ reply: "Invalid AI response" });
+    }
 
     if (!response.ok) {
       return res.status(500).json({
@@ -95,12 +106,12 @@ export const chatController = async (req, res) => {
   } catch (err) {
     console.error("Chat error:", err);
     return res.status(500).json({
-      reply: "⚠️ Server error",
+      reply: "Server error",
     });
   }
 };
 
-/* ================= STREAMING CHAT (🔥 MAIN UPGRADE) ================= */
+/* ================= STREAMING CHAT ================= */
 export const streamChat = async (req, res) => {
   try {
     const message = req.query.message;
@@ -110,7 +121,7 @@ export const streamChat = async (req, res) => {
       return res.end();
     }
 
-    /* SSE HEADERS */
+    /* 🔥 SSE HEADERS */
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -123,15 +134,19 @@ export const streamChat = async (req, res) => {
 
     if (state === "low_energy" || state === "stress") {
       enhancedMessage +=
-        "\n\n[User may need reset. Suggest short recovery naturally]";
+        "\n\n[User may benefit from a short reset suggestion]";
     }
+
+    /* 🎯 Smart temperature */
+    let temperature = 0.6;
+    if (state === "technical") temperature = 0.2;
+    if (state === "emotional") temperature = 0.7;
 
     const messages = [
       { role: "system", content: systemPrompt },
       { role: "user", content: enhancedMessage },
     ];
 
-    /* STREAM CALL */
     const response = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
       {
@@ -143,12 +158,13 @@ export const streamChat = async (req, res) => {
         body: JSON.stringify({
           model: env.ai.model,
           messages,
-          stream: true, // 🔥 IMPORTANT
+          stream: true,
+          temperature,
         }),
       }
     );
 
-    if (!response.ok) {
+    if (!response.ok || !response.body) {
       res.write("data: ERROR\n\n");
       return res.end();
     }
@@ -156,15 +172,18 @@ export const streamChat = async (req, res) => {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
 
+    let buffer = "";
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const chunk = decoder.decode(value);
+      buffer += decoder.decode(value, { stream: true });
 
-      const lines = chunk.split("\n");
+      const parts = buffer.split("\n");
+      buffer = parts.pop(); // keep incomplete chunk
 
-      for (let line of lines) {
+      for (let line of parts) {
         if (line.startsWith("data: ")) {
           const data = line.replace("data: ", "").trim();
 
@@ -181,8 +200,8 @@ export const streamChat = async (req, res) => {
             if (content) {
               res.write(`data: ${content}\n\n`);
             }
-          } catch (e) {
-            // ignore invalid chunks
+          } catch {
+            // ignore invalid chunks safely
           }
         }
       }
