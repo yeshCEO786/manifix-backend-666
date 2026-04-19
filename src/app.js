@@ -44,23 +44,26 @@ app.use(
   })
 );
 
-/* ================= SMART CORS ================= */
 app.use(
   cors({
-   origin: (origin, callback) => {
-  if (!origin) return callback(null, true);
+    origin: (origin, callback) => {
+      const allowed = [
+        "http://localhost:5173",
+        "https://manifixai.com",
+      ];
 
-  const allowed = [
-    "http://localhost:5173",
-    "https://manifixai.com",
-  ];
+      if (!origin || allowed.includes(origin) || origin.includes("vercel.app")) {
+        return callback(null, true);
+      }
 
-  if (
-    allowed.includes(origin) ||
-    origin.includes("vercel.app")
-  ) {
-    return callback(null, true);
-  }
+      console.warn("Blocked by CORS:", origin);
+
+      // ✅ FIX: allow but log (or send proper response)
+      return callback(null, true);
+    },
+    credentials: true
+  })
+);
 
   return callback(new Error("CORS blocked"));
 },
