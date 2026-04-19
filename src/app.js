@@ -52,26 +52,24 @@ app.use(
         "https://manifixai.com",
       ];
 
-      if (!origin || allowed.includes(origin) || origin.includes("vercel.app")) {
+      if (
+        !origin ||
+        allowed.includes(origin) ||
+        origin.includes("vercel.app")
+      ) {
         return callback(null, true);
       }
 
       console.warn("Blocked by CORS:", origin);
 
-      // ✅ FIX: allow but log (or send proper response)
+      // ✅ Allow for now (no hard block)
       return callback(null, true);
     },
-    credentials: true
-  })
-);
-
-  return callback(new Error("CORS blocked"));
-},
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
   })
 );
-
 /* ================= BODY ================= */
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
