@@ -1,10 +1,18 @@
-// server.js
-import 'dotenv/config';           // Load .env locally
-import app from './src/app.js';   // Your Express app
-import './jobs/expirePremium.js'; // Start scheduled jobs
+import 'dotenv/config';
 
-const PORT = process.env.PORT || 8080;
+try {
+  const appModule = await import('./src/app.js');
+  const app = appModule.default;
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+  await import('./jobs/expirePremium.js');
+
+  const PORT = process.env.PORT || 8080;
+
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
+
+} catch (err) {
+  console.error("🔥 STARTUP CRASH:", err);
+  process.exit(1);
+}
